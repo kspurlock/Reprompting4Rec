@@ -1,0 +1,21 @@
+{
+    "result_path": "test_results/",
+    "k": 5,
+    "final_k": 20,
+    "allow_explanations": false,
+    "num_prompts": 3,
+    "num_examples": 10,
+    "eval_size": 0.33,
+    "temperature": 0.2,
+    "num_replicates": 3,
+    "selection_style": "stratified",
+    "evaluation_style": "weighted",
+    "prompt_style": "zero",
+    "embedding_level": 4,
+    "min_sim_quantile": 0.99,
+    "title_threshold": 0.75,
+    "random_state": 22222,
+    "model": "random",
+    "use_aux": false,
+    "allow_popular_movies": true
+}
