@@ -58,24 +58,12 @@ def init_result_files(param: RecParam):
             "dislike_eval_size",
         ]
 
-        recall_fields = ["recall_" + str(i) for i in range(param.num_prompts - 1)] + [
-            "recall_final"
-        ]
-        precision_fields = [
-            "precision_" + str(i) for i in range(param.num_prompts - 1)
-        ] + ["precision_final"]
-        ncdg_fields = ["ndcg_" + str(i) for i in range(param.num_prompts - 1)] + [
-            "ndcg_final"
-        ]
-        ils_fields = ["ils_" + str(i) for i in range(param.num_prompts - 1)] + [
-            "ils_final"
-        ]
-        ap_fields = ["ap_" + str(i) for i in range(param.num_prompts - 1)] + [
-            "ap_final"
-        ]
-        dq_fields = ["dq_" + str(i) for i in range(param.num_prompts - 1)] + [
-            "dq_final"
-        ]
+        recall_fields = ["recall_" + str(i) for i in range(param.num_prompts - 1)] + ["recall_final"]
+        precision_fields = ["precision_" + str(i) for i in range(param.num_prompts - 1)] + ["precision_final"]
+        ncdg_fields = ["ndcg_" + str(i) for i in range(param.num_prompts - 1)] + ["ndcg_final"]
+        ils_fields = ["ils_" + str(i) for i in range(param.num_prompts - 1)] + ["ils_final"]
+        ap_fields = ["ap_" + str(i) for i in range(param.num_prompts - 1)] + ["ap_final"]
+        
         combined_fields = (
             param_fields
             + size_fields
@@ -84,7 +72,6 @@ def init_result_files(param: RecParam):
             + ncdg_fields
             + ils_fields
             + ap_fields
-            + dq_fields
         )
 
         row = ",".join(i for i in combined_fields) + "\n"
@@ -123,8 +110,7 @@ async def write_results(
         ndcgs = evaluator.ndcg_at_p
         ils = evaluator.ils_at_p
         aps = evaluator.ap_at_p
-        dqs = evaluator.delinquency_at_p
-        combined = param_info + sizes + recalls + precisions + ndcgs + ils + aps + dqs
+        combined = param_info + sizes + recalls + precisions + ndcgs + ils + aps
 
         row = ",".join(str(i) for i in combined) + "\n"
         f.write(row)
@@ -152,9 +138,9 @@ async def single_conversation(
     prompter: Prompter,
     param: RecParam,
 ):
-    ##################################################
+    #-------------------------------------------------
     # SETUP EACH ENTITY IN THE PIPELINE
-    ##################################################
+    #-------------------------------------------------
     user = construct_user(uid, user_split, item_dict)
 
     evaluator = Evaluator()
@@ -162,9 +148,11 @@ async def single_conversation(
     like_feedback_set = construct_set(user, "like", "feedback", item_dict)
     dislike_feedback_set = construct_set(user, "dislike", "feedback", item_dict)
 
-    ########################################################
+    #-------------------------------------------------
     # RECOMMENDER TYPE
-    ########################################################
+    #-------------------------------------------------
+    # NOTE: Might be better to initialize outside and deepcopy
+    
     if param.model == "dummy":
         recommender = DummyRec(title_list=item_dict.get_all_titles(), random_state=None)
 
@@ -177,12 +165,9 @@ async def single_conversation(
     else:
         recommender = GPTRec(model=param.model, temperature=param.temperature)
 
-    # NOTE: this needs to be moved outside. It doesn't make sense to do this here
-
-    ###################################################################################
+    #----------------------------------------------------------------------------------
     # INITIAL MESSAGE (DETERMINED BY PROMPTING STYLE: COT/FEW-SHOT/ZERO-SHOT)
-    ###################################################################################
-
+    #----------------------------------------------------------------------------------
     if param.prompt_style == "zero":
         init_prompt = prompter.build_zeroshot_prompt(
             like_titles=user.titles["like"]["example"],
@@ -209,9 +194,9 @@ async def single_conversation(
 
     recommender.add_message(init_prompt)
 
-    ##################################################
+    #-------------------------------------------------
     # BEGIN PROMPT LOOP
-    ##################################################
+    #-------------------------------------------------
     for p in range(param.num_prompts - 1):
         # For NMF variant
         if "user" in param.model:
@@ -247,10 +232,9 @@ async def single_conversation(
         next_input = prompter.build_next_prompt(invalid_recs, valid_recs, retry=retry)
         recommender.add_message(next_input)
 
-    ##################################################
+    #-------------------------------------------------
     # REPEAT EVALUATION ON FINAL PROMPT
-    ##################################################
-
+    #-------------------------------------------------
     like_eval_set = construct_set(user, "like", "eval", item_dict)
     dislike_eval_set = construct_set(user, "dislike", "eval", item_dict)
 

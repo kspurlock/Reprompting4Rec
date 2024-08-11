@@ -1,11 +1,6 @@
 import copy
-from typing import Iterable, Union, Optional
+from typing import Iterable, Union, Optional, Dict
 import numpy as np
-
-# def min_max_scale(x, new_min, new_max, old_min, old_max):
-#    n = (x - old_min) * (new_max - new_min)
-#    d = old_max - old_min
-#    return new_min + n / d
 
 
 class User:
@@ -15,7 +10,7 @@ class User:
         iid_dict: dict,
         title_dict: dict,
         rating_dict: dict,
-        embedding_dict: dict[np.ndarray],
+        embedding_dict: Dict[str, np.ndarray],
     ):
         self.uid = uid
         self.iids = iid_dict
@@ -99,17 +94,7 @@ def construct_set(user: User, sentiment: str, set_type: str, item_dict) -> SetCo
 
 
 class Evaluator:
-    def __init__(
-        self,
-        # old_sim_scale: tuple[float],
-        # new_sim_scale: tuple[float],
-        # similarity_threshold: float,
-
-    ):
-        # For scaling similarities
-        # self._old_sim_scale = old_sim_scale
-        # self._new_sim_scale = new_sim_scale
-        # self._similarity_threshold = similarity_threshold
+    def __init__(self):
         self.all_predicted_titles = []
 
         # Statistics
@@ -117,7 +102,6 @@ class Evaluator:
         self.precision_at_p = []
         self.ndcg_at_p = []
         self.ils_at_p = []
-        self.delinquency_at_p = []
         self.ap_at_p = []
         self.covered = 0
         self.unmatched_count = 0
@@ -130,25 +114,12 @@ class Evaluator:
         discounts = np.log2(np.arange(2, len(relevant) + 2))
         idcg = np.sum((np.power(2, (relevant >= 0)) - 1) / discounts)
         dcg = np.sum((np.power(2, (relevant == 1)) - 1) / discounts)
-        
+
         if (idcg == 0).any():
             ndcg = 0
         else:
             ndcg = dcg / idcg
         return ndcg
-
-#     def _compute_ndcg_weighted(
-#         self, relevant: np.ndarray, weights: np.ndarray
-#     ) -> float:
-#         discounts = np.log2(np.arange(2, len(relevant) + 2))
-#         idcg = np.sum(((relevant >= 0)*5) / discounts)
-#         dcg = np.sum(((relevant == 1)*weights) / discounts)
-        
-#         if (idcg == 0).any():
-#             ndcg = 0
-#         else:
-#             ndcg = dcg / idcg
-#         return ndcg
 
     def _compute_ILS(self, pred_embeddings: np.ndarray) -> float:
         sim = pred_embeddings @ pred_embeddings.T
@@ -215,15 +186,6 @@ class Evaluator:
         self.ils_at_p.append(ils)
         self.ap_at_p.append(ap)
 
-        #################################
-        # DETERMINE DELINQUENCY
-        #################################
-        dq_occur = 0
-        for title in pred_titles:
-            if title in self.all_predicted_titles:
-                dq_occur += 1
-
-        self.delinquency_at_p.append(dq_occur / len(pred_titles))
         self.all_predicted_titles += pred_titles
 
         irrelevant_titles = np.array(pred_titles)[(relevant == 0)]
@@ -248,7 +210,7 @@ class Evaluator:
         combined_embeddings = np.vstack((l_embeddings, d_embeddings))
         combined_ratings = np.array(l_ratings + d_ratings)
         combined_quantiles = np.array(l_quantiles + d_quantiles)
-        
+
         try:
             like_sim_mat = (
                 pred_embeddings @ liked_set.embeddings.T
@@ -256,9 +218,9 @@ class Evaluator:
             dislike_most_similar = np.max(
                 pred_embeddings @ disliked_set.embeddings.T, axis=1
             )  # K x 1
-            
+
         except ValueError:
-            return [""], [""] # NOTE: stupid fix, remove later
+            return [""], [""]
 
         base_relevant = np.zeros(
             len(pred_titles)
@@ -302,15 +264,6 @@ class Evaluator:
         self.ils_at_p.append(ils)
         self.ap_at_p.append(ap)
 
-        #################################
-        # DETERMINE DELINQUENCY
-        #################################
-        dq_occur = 0
-        for title in pred_titles:
-            if title in self.all_predicted_titles:
-                dq_occur += 1
-
-        self.delinquency_at_p.append(dq_occur / len(pred_titles))
         self.all_predicted_titles += pred_titles
 
         irrelevant_titles = np.array(pred_titles)[(full_relevant == 0)]

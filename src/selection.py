@@ -1,4 +1,4 @@
-from typing import Iterable, Union
+from typing import Iterable, Union, Dict, Sequence, Tuple
 import numpy as np
 from sklearn.model_selection import train_test_split
 import pandas as pd
@@ -9,11 +9,11 @@ import copy
 
 def select_users(
     data: pd.DataFrame,
-    quantile_range: float,
+    quantile_range: Tuple[float, float],
     num_users: int,
     rating_threshold: float = 3.0,
     num_disliked_threshold: float = 10,
-) -> dict[dict[Iterable]]:
+) -> Dict:
     rating_table = data.pivot(
         index="userID", columns="movieID", values="rating"
     ).fillna(0)
@@ -62,8 +62,8 @@ def select_users(
 
 
 def split_try_stratify(
-    X: Iterable[tuple], train_size: float, random_state: int
-) -> tuple[Iterable, Iterable]:
+    X: Iterable[tuple], train_size: float, random_state: Union[int, None] = None
+) -> Tuple[Iterable, Iterable]:
     _, rating_scores = zip(*X)
     score_class, score_counts = np.unique(rating_scores, return_counts=True)
 
@@ -88,11 +88,11 @@ def split_try_stratify(
 
 
 def example_feedback_eval_split(
-    user_rated_items: Iterable,
+    user_rated_items: Sequence,
     example_size: Union[int, float],
     eval_size: float,
-    random_state: int,
-) -> dict[Iterable]:
+    random_state: Union[int, None] = None,
+) -> Dict:
     size = len(user_rated_items)
 
     if size == 0:
@@ -102,9 +102,9 @@ def example_feedback_eval_split(
         iids, _ = zip(*user_rated_items)
         return {"example": iids, "feedback": iids, "eval": iids}
 
-    ####################################
+    #-----------------------------------
     # ADJUSTING SPLIT SIZES IF NECESSARY
-    ####################################
+    #-----------------------------------
 
     if isinstance(
         example_size, float
@@ -125,9 +125,9 @@ def example_feedback_eval_split(
         example_size_ = int(size / 3)
         feedback_size_ = int((size - example_size_) / 2)
 
-    ###################################
+    #----------------------------------
     # BEGINNING SPLITTING
-    ###################################
+    #----------------------------------
 
     example_set, feedback_and_eval_set = split_try_stratify(
         user_rated_items, train_size=example_size_, random_state=random_state
@@ -137,23 +137,19 @@ def example_feedback_eval_split(
         feedback_and_eval_set, train_size=feedback_size_, random_state=random_state
     )
 
-    ###################################
+    #----------------------------------
     # PACKAGING AND RETURN
-    ###################################
-#    example_iids, example_ratings = zip(*example_set)
-#    feedback_iids, feedback_ratings = zip(*feedback_set)
-#    eval_iids, eval_ratings = zip(*eval_set)
-
+    #----------------------------------
     packaged = {"example": example_set, "feedback": feedback_set, "eval": eval_set}
     return packaged
 
 
 def select_item_splits(
-    user_selections: dict[dict[Iterable]],
+    user_selections: Dict,
     example_size: Union[int, float],
     eval_size: float,
-    random_state: int,
-) -> dict[dict[dict[Iterable]]]:
+    random_state: Union[int, None] = None,
+) -> Dict:
     user_splits = {uid: {"like": None, "dislike": None} for uid in user_selections}
 
     for uid, rated_items in user_selections.items():
@@ -173,62 +169,44 @@ def select_item_splits(
     return user_splits
 
 
-#def select_kmedoids_splits(
-#    user_splits: dict, item_dict, k: int, random_state: int = None
-#):
-#    medoid_user_splits = copy.deepcopy(user_splits)
-
-#    for uid, splits in medoid_user_splits.items():
-#        for sentiment in splits:  # like/dislike
-#            for set_type in splits[sentiment]:  # example/feedback/eval
-#                item_set = splits[sentiment][set_type]
-#                if len(item_set) <= k:
-#                    pass
-#                else:
-#                    embeddings = item_dict.get_embedding_from_iid(item_set)
-#                    diss_matrix = 1 - (
-#                        embeddings @ embeddings.T
-#                    )  # Maybe need to scale this?
-#                    medoid_indices = kmedoids.fasterpam(
-#                        diss_matrix, medoids=k, random_state=random_state
-#                    ).medoids
-#                    medoid_iids = np.array(item_set)[medoid_indices]
-#                    medoid_user_splits[uid][sentiment][set_type] = tuple(medoid_iids)
-
-#    return medoid_user_splits
-
 def select_kmedoid_splits(
-    user_splits: dict, item_dict, random_state: int = None
-    ):
+    user_splits: dict, item_dict, random_state: Union[int, None] = None
+):
     medoid_user_splits = copy.deepcopy(user_splits)
     for uid, splits in medoid_user_splits.items():
         for sentiment in splits:
             for set_type in splits[sentiment]:
                 iids, ratings = zip(*splits[sentiment][set_type])
                 rating_values, counts = np.unique(ratings, return_counts=True)
-                
+
                 embeddings = item_dict.get_embedding_from_iid(iids)
                 iids_ = np.array(iids)
                 ratings_ = np.array(ratings)
-                
+
                 new_set = []
                 for i, r in enumerate(rating_values):
-                    ratio = 1/len(counts)
-                    if (counts[i] > (int(counts.sum() * ratio))) and (counts.sum() > 10):
+                    ratio = 1 / len(counts)
+                    if (counts[i] > (int(counts.sum() * ratio))) and (
+                        counts.sum() > 10
+                    ):
                         diss_matrix = 1 - (
                             embeddings[ratings == r] @ embeddings[ratings == r].T
                         )
                         medoid_indices = kmedoids.fasterpam(
-                            diss_matrix, medoids=int(counts.sum() * ratio), random_state=random_state
+                            diss_matrix,
+                            medoids=int(counts.sum() * ratio),
+                            random_state=random_state,
                         ).medoids
-                        
+
                         medoid_iids = iids_[ratings == r][medoid_indices]
                         new_set += list(zip(medoid_iids, ratings_[ratings == r]))
                     else:
-                        new_set += list(zip(iids_[ratings == r], ratings_[ratings == r]))
-                        
+                        new_set += list(
+                            zip(iids_[ratings == r], ratings_[ratings == r])
+                        )
+
                 medoid_user_splits[uid][sentiment][set_type] = new_set
-                
+
     return medoid_user_splits
 
 
@@ -250,6 +228,6 @@ if __name__ == "__main__":
         selected_users, 10, eval_size=1 / 3, random_state=192
     )
 
-    item_dict = dict_from_h5(path="data/embeddings/hetrec_gpt3_embed.h5", quantile=0.85)
+    item_dict = dict_from_h5(path="data/embeddings/hetrec_gpt3_embed.h5")
 
-    #select_kmedoids_splits(user_splits, item_dict, k=10, random_state=192)
+    # select_kmedoids_splits(user_splits, item_dict, k=10, random_state=192)

@@ -6,11 +6,11 @@ from typing import Optional, Union, Iterable
 import dataclasses
 import json
 import numpy as np
-import replicate.exceptions
-import replicate.exceptions
 import torch
 import pickle
+
 import replicate
+import replicate.exceptions
 import httpcore
 
 
@@ -23,9 +23,9 @@ class RecParam:
     num_prompts: int
     num_examples: Union[float, int]
     eval_size: float
-    temperature: int
+    temperature: float
     num_replicates: int
-    selection_style: str  # Either random or kmedoids
+    selection_style: str  # Either stratified or kmedoids
     evaluation_style: str
     prompt_style: str
     embedding_level: int
@@ -46,32 +46,12 @@ class RecParam:
             param = RecParam(**json.load(f))
         return param
 
-
-#def load_parameters(path: str) -> RecParam:
-#    with open(path, "r") as f:
-#        param = RecParam(**json.load(f))
-#    return param
-
-
-# logger = logging.getLogger("gpt_api_logger")
-# log_time = time.strftime("log_%y-%h-%d_%H_%M")
-# handler = logging.FileHandler(f"logs/{log_time}.log", "w")
-# logger.addHandler(handler)
-# logger.setLevel(logging.DEBUG)
-
-# item_filter_pat = re.compile(r"(?:\d\.\s+)(\w.+\(\d+\))")
-
-# def extract_gpt_rec(response: str) -> list[str]:
-#     return item_filter_pat.findall(response)
-
-item_filter_pat = re.compile(r"(?:\d\.\s+)([\w\s]+\(\d+\))")
-item_filter_pat_backup = re.compile(r"(?:\d\.\s+)(\w.+\(\d+\))") # Note that this seems to be more consistent
-
+item_filter_pat = re.compile(r"(?:\d\.\s+)(\w.+\(\d+\))")
 
 def extract_gpt_rec(response: str) -> list[str]:
-    titles = item_filter_pat_backup.findall(response)
+    titles = item_filter_pat.findall(response)
     if len(titles) < 5:
-        titles = item_filter_pat_backup.findall(response)
+        titles = item_filter_pat.findall(response)
     return titles
 
 def build_llama_prompt(messages: list[dict]) -> str:
@@ -89,7 +69,6 @@ def build_llama_prompt(messages: list[dict]) -> str:
             prompt += "\n[INST]{} [/INST]".format(msg["content"])
             
     return prompt
-
 
 class RecommenderCore:
     def set_k(self, k: int) -> None:

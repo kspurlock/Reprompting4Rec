@@ -1,8 +1,6 @@
 import json
-import matplotlib.pyplot as plt
 from collections import Counter
 import os
-plt.rc("font", family="DejaVu Sans")
 
 def compute_novelty(param) -> None:
     all_count = Counter()

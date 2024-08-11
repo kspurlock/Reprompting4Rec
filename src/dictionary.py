@@ -205,17 +205,15 @@ class ItemDictionary:
             self._iid_to_year.update(new_iid_to_year)
             self._title_to_iid.update(new_title_to_iid)
     
+    @staticmethod
+    def from_h5(path: str):
+        with h5py.File(path, "r") as handle:
+            item_ids = handle["MovieID"][:] - 1
+            years = handle["ReleaseYear"][:]
+            titles = [i.decode("utf-8") for i in handle["MovieTitle"][:]]
+            title_years = [title + f" ({year})" for title, year in zip(titles, years)]
+            item_embeddings = handle["Embedding"][:]
 
-
-def dict_from_h5(
-    path: str,
-) -> ItemDictionary:
-    with h5py.File(path, "r") as handle:
-        item_ids = handle["MovieID"][:] - 1
-        years = handle["ReleaseYear"][:]
-        titles = [i.decode("utf-8") for i in handle["MovieTitle"][:]]
-        title_years = [title + f" ({year})" for title, year in zip(titles, years)]
-        item_embeddings = handle["Embedding"][:]
-
-    item_dict = ItemDictionary(item_ids, years, title_years, item_embeddings)
-    return item_dict
+        item_dict = ItemDictionary(item_ids, years, title_years, item_embeddings)
+       
+        return item_dict
